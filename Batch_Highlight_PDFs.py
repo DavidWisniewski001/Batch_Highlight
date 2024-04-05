@@ -2,6 +2,7 @@ import csv
 import fitz  # PyMuPDF
 import tkinter as tk
 from tkinter import filedialog
+import os
 
 def is_already_highlighted(page, match):
     # Check if the match is already highlighted on the page
@@ -9,13 +10,17 @@ def is_already_highlighted(page, match):
         if annot.type[0] == 8 and annot.info['content'] == match:
             return True
     return False
-
-def highlight_text(input_pdf_path, search_strings, output_pdf_path=None):
-    found_strings = []
-    not_found_strings = []
-
+    
+def highlight_text(input_pdf_path, search_strings):
     # Open the PDF file
     pdf_document = fitz.open(input_pdf_path)
+
+    output_folder, input_file_name = os.path.split(input_pdf_path)
+    output_file_name = os.path.splitext(input_file_name)[0] + '_NEW.pdf'
+    output_pdf_path = os.path.join(output_folder, output_file_name)
+
+    found_strings = []
+    not_found_strings = []
 
     for page in pdf_document:
         for search_string in search_strings:
@@ -23,25 +28,16 @@ def highlight_text(input_pdf_path, search_strings, output_pdf_path=None):
             matches = page.search_for(search_string)
             
             # Highlight each match if it's not already highlighted
-            found = False
             for match in matches:
                 if not is_already_highlighted(page, match):
                     highlight = page.add_highlight_annot(match)
                     highlight.update()
-                    found = True
                     found_strings.append(search_string)
-                    break
+                else:
+                    not_found_strings.append(search_string)
 
-            if not found:
-                not_found_strings.append(search_string)
-
-    # Save the modified PDF if an output path is provided
-    if output_pdf_path:
-        pdf_document.save(output_pdf_path)
-    else:
-        # Save the modified PDF with a default name/location
-        default_output_path = input_pdf_path.replace('.pdf', '_NEW.pdf')
-        pdf_document.save(default_output_path)
+    # Save the modified PDF with the new name and location
+    pdf_document.save(output_pdf_path)
 
     # Close the PDF document
     pdf_document.close()
@@ -60,15 +56,15 @@ def highlight_text(input_pdf_path, search_strings, output_pdf_path=None):
 
 def browse_file(entry_var):
     file_path = filedialog.askopenfilename()
-    entry_var.set(file_path)
+    entry_var.delete(0, tk.END)  # Clear the entry field
+    entry_var.insert(0, file_path)  # Insert the selected file path into the entry field
 
 def run_highlighter():
     input_pdf_path = entry_input_pdf.get()
     csv_file_path = entry_csv_file.get()
-    output_pdf_path = entry_output_pdf.get()
 
     search_strings = read_search_strings_from_csv(csv_file_path)
-    highlight_text(input_pdf_path, search_strings, output_pdf_path)
+    highlight_text(input_pdf_path, search_strings)
     tk.messagebox.showinfo("Information", "Text highlighted successfully! Check CSV files for results.")
 
 # Read search strings from CSV
@@ -99,14 +95,6 @@ entry_csv_file = tk.Entry(root, width=50)
 entry_csv_file.pack()
 button_browse_csv_file = tk.Button(root, text="Browse", command=lambda: browse_file(entry_csv_file))
 button_browse_csv_file.pack()
-
-# Output PDF file path
-label_output_pdf = tk.Label(root, text="Output PDF File Path:")
-label_output_pdf.pack()
-entry_output_pdf = tk.Entry(root, width=50)
-entry_output_pdf.pack()
-button_browse_output_pdf = tk.Button(root, text="Browse", command=lambda: browse_file(entry_output_pdf))
-button_browse_output_pdf.pack()
 
 # Run button
 button_run = tk.Button(root, text="Run Highlighter", command=run_highlighter)
